@@ -20,4 +20,10 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]: 
         return [origin.strip() for origin in self.cors_origins.split(",")] 
 
+    @property
+    def sqlalchemy_database_url(self) -> str: 
+        return self.database_url.replace(
+            "postgresql://", "postgresql+psycopg://", 1
+        )
+
 settings = Settings() 
