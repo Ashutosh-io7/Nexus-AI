@@ -1,3 +1,5 @@
+import Reveal from '../ui/Reveal'
+
 const PRINCIPLES = [
   {
     title: 'No data, no guess.',
@@ -21,7 +23,7 @@ function Principles() {
   return (
     <section className="border-t border-line">
       <div className="mx-auto max-w-6xl px-6 py-20">
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-end lg:gap-16">
+        <Reveal className="grid gap-6 lg:grid-cols-2 lg:items-end lg:gap-16">
           <h2 className="font-display text-3xl font-medium leading-tight tracking-tight sm:text-4xl">
             Every answer shows what it is based on.
           </h2>
@@ -30,14 +32,18 @@ function Principles() {
             Nexus is built to follow, and each one applies as its feature
             ships.
           </p>
-        </div>
+        </Reveal>
 
         <dl className="mt-14 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-          {PRINCIPLES.map((item) => (
-            <div key={item.title} className="border-t border-line pt-5">
+          {PRINCIPLES.map((item, index) => (
+            <Reveal
+              key={item.title}
+              delay={index * 100}
+              className="border-t border-line pt-5"
+            >
               <dt className="font-medium text-ink">{item.title}</dt>
               <dd className="mt-2 leading-relaxed text-muted">{item.text}</dd>
-            </div>
+            </Reveal>
           ))}
         </dl>
       </div>

@@ -13,8 +13,33 @@
   --color-line: #e4e7ec;        /* borders and dividers */
   --color-accent: #0e5f66;      /* buttons, links, brand */
   --color-risk-medium: #b45309; /* only ever means "medium risk" */
-  --color-risk-high: #b42318;   /* only ever means "high risk" */
-}
+  --color-risk-high: #b42318;   /* only ever means "high risk" */ 
+
+  /* Animation: elements rise gently into place */
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  } 
+
+  --animate-draw-line: draw-line 0.5s ease-out backwards;
+
+  @keyframes draw-line {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+} 
 
 @layer base {
   body {

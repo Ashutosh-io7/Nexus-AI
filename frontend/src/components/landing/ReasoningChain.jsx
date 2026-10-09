@@ -55,11 +55,16 @@ function ReasoningChain() {
           const isLast = index === STEPS.length - 1
 
           return (
-            <li key={step.title} className="relative pb-7 pl-12 last:pb-0">
+            <li
+              key={step.title}
+              className="relative pb-7 pl-12 last:pb-0 motion-safe:animate-fade-up"
+              style={{ animationDelay: `${450 + index * 150}ms` }}
+            >
               {!isLast && (
                 <span
                   aria-hidden="true"
-                  className="absolute bottom-1 left-4 top-10 w-px bg-line"
+                  className="absolute bottom-1 left-4 top-10 w-px origin-top bg-line motion-safe:animate-draw-line"
+                  style={{ animationDelay: `${650 + index * 150}ms` }}
                 />
               )}
               <span
