@@ -1,23 +1,52 @@
 import { Link } from 'react-router-dom'
+import ReasoningChain from '../components/landing/ReasoningChain'
 
 function Landing() {
   return (
-    <main className="min-h-screen flex items-center justify-center p-6">
-      <div className="text-center">
-        <h1 className="font-display text-5xl font-medium tracking-tight text-ink">
-          Nexus AI landing page
-        </h1>
-        <p className="mt-3 text-muted">
-          Placeholder. We build the real page in the next steps.
-        </p>
+    <div className="min-h-screen">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <Link
+          to="/"
+          className="font-display text-2xl font-medium tracking-tight"
+        >
+          Nexus AI
+        </Link>
         <Link
           to="/app"
-          className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink hover:border-accent"
         >
           Open Nexus
         </Link>
-      </div>
-    </main>
+      </header>
+
+      <main>
+        <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 pb-20 pt-10 lg:grid-cols-2 lg:pt-16">
+          <div>
+            <h1 className="max-w-xl font-display text-4xl font-medium leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+              Know which customers are likely to leave, and why.
+            </h1>
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted">
+              Nexus brings your customer data, churn risk and support history
+              together, so your team can see why a customer is at risk and
+              decide what to do next.
+            </p>
+            <Link
+              to="/app"
+              className="mt-8 inline-block rounded-lg bg-accent px-5 py-3 text-sm font-medium text-white hover:opacity-90"
+            >
+              Open Nexus
+            </Link>
+            <p className="mt-6 max-w-md text-sm text-muted">
+              Early build: importing customer CSV files works today. Risk
+              prediction, support evidence and recommendations are in
+              development.
+            </p>
+          </div>
+
+          <ReasoningChain />
+        </section>
+      </main>
+    </div>
   )
 }
 
