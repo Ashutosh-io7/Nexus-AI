@@ -1,1 +1,32 @@
-@import "tailwindcss"; 
+@import "tailwindcss";
+
+@theme {
+  /* Fonts */
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Newsreader", ui-serif, Georgia, serif;
+
+  /* Colors */
+  --color-paper: #f6f7f9;       /* page background */
+  --color-surface: #ffffff;     /* panels sitting on the page */
+  --color-ink: #101828;         /* main text */
+  --color-muted: #596275;       /* secondary text */
+  --color-line: #e4e7ec;        /* borders and dividers */
+  --color-accent: #0e5f66;      /* buttons, links, brand */
+  --color-risk-medium: #b45309; /* only ever means "medium risk" */
+  --color-risk-high: #b42318;   /* only ever means "high risk" */
+}
+
+@layer base {
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Visible keyboard focus everywhere (accessibility) */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
