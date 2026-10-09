@@ -67,7 +67,7 @@ function StatusPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
+    <div>
       <div className="w-full max-w-md">
         <h1 className="text-3xl font-semibold tracking-tight">Nexus AI</h1>
         <p className="mt-1 text-slate-600">
@@ -104,7 +104,7 @@ function StatusPage() {
           )}
         </section>
       </div>
-    </main>
+    </div>
   )
 }
 
