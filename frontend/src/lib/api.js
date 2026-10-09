@@ -37,4 +37,25 @@ export async function previewCustomersCsv(file) {
 
   if (!response.ok) throw new Error(await readErrorMessage(response))
   return response.json()
+} 
+
+
+export async function importCustomersCsv(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}/api/v1/customers/upload`, {
+      method: 'POST',
+      body: formData,
+    })
+  } catch {
+    throw new Error(
+      "Can't reach the Nexus API. Make sure the backend is running.",
+    )
+  }
+
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
 }

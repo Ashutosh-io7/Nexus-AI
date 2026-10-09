@@ -1,6 +1,6 @@
-import { AlertCircle, FileUp, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, FileUp, Loader2 } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { previewCustomersCsv } from '../lib/api'
+import { importCustomersCsv, previewCustomersCsv } from '../lib/api'
 
 // Friendly names for the fields the backend can recognize.
 const FIELD_LABELS = {
@@ -99,6 +99,67 @@ function SampleRows({ preview }) {
       </div>
     </section>
   )
+} 
+
+
+const STATUS_TEXT = {
+  completed: 'Import completed',
+  partial: 'Import finished, some rows were skipped',
+  failed: 'Nothing was imported',
+}
+
+function ImportResult({ result }) {
+  const shownErrors = result.error_summary.slice(0, 10)
+  const hiddenErrors = result.error_summary.length - shownErrors.length
+
+  return (
+    <section
+      aria-labelledby="result-heading"
+      className="mt-8 rounded-lg border border-line bg-surface p-5"
+    >
+      <h2 id="result-heading" className="flex items-center gap-2 font-medium">
+        {result.status === 'completed' && (
+          <CheckCircle2 size={18} className="text-accent" aria-hidden="true" />
+        )}
+        {STATUS_TEXT[result.status] ?? result.status}
+      </h2>
+      <p className="mt-1 text-sm text-muted">{result.filename}</p>
+
+      <dl className="mt-4 grid grid-cols-3 gap-4 text-sm">
+        <div>
+          <dt className="text-muted">New customers</dt>
+          <dd className="mt-1 text-xl font-medium">{result.inserted_count}</dd>
+        </div>
+        <div>
+          <dt className="text-muted">Updated</dt>
+          <dd className="mt-1 text-xl font-medium">{result.updated_count}</dd>
+        </div>
+        <div>
+          <dt className="text-muted">Skipped</dt>
+          <dd className="mt-1 text-xl font-medium">{result.failed_count}</dd>
+        </div>
+      </dl>
+
+      {shownErrors.length > 0 && (
+        <div className="mt-5">
+          <h3 className="text-sm font-medium">Rows that were skipped</h3>
+          <p className="mt-1 text-sm text-muted">
+            Row numbers are lines in your file. Line 1 is the header.
+          </p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {shownErrors.map((item) => (
+              <li key={item.row}>
+                Row {item.row}: {item.error}
+              </li>
+            ))}
+          </ul>
+          {hiddenErrors > 0 && (
+            <p className="mt-2 text-sm text-muted">and {hiddenErrors} more.</p>
+          )}
+        </div>
+      )}
+    </section>
+  )
 }
 
 function ImportPage() {
@@ -113,7 +174,7 @@ function ImportPage() {
     setState({ phase: 'loading', fileName: file.name })
     try {
       const preview = await previewCustomersCsv(file)
-      setState({ phase: 'ready', fileName: file.name, preview })
+      setState({ phase: 'ready', file, fileName: file.name, preview })
     } catch (error) {
       setState({ phase: 'error', fileName: file.name, message: error.message })
     }
@@ -121,7 +182,27 @@ function ImportPage() {
     input.value = ''
   }
 
-  const { phase, fileName, preview, message } = state
+  async function handleImport() {
+    const { file, fileName, preview } = state
+    setState({ phase: 'importing', file, fileName, preview })
+    try {
+      const result = await importCustomersCsv(file)
+      setState({ phase: 'done', fileName, result })
+    } catch (error) {
+      // Keep the preview on screen so the person can simply try again.
+      setState({
+        phase: 'ready',
+        file,
+        fileName,
+        preview,
+        importError: error.message,
+      })
+    }
+  }
+
+  const { phase, fileName, preview, result, message, importError } = state
+  const busy = phase === 'loading' || phase === 'importing'
+  const showPreview = phase === 'ready' || phase === 'importing'
   const hasCustomerId =
     preview && Object.values(preview.detected_mappings).includes('external_id')
 
@@ -148,8 +229,8 @@ function ImportPage() {
         <button
           type="button"
           onClick={() => inputRef.current.click()}
-          disabled={phase === 'loading'}
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+          disabled={busy}
+          className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm font-medium hover:border-accent disabled:opacity-60"
         >
           <FileUp size={16} aria-hidden="true" />
           Choose CSV file
@@ -166,7 +247,7 @@ function ImportPage() {
 
       {phase === 'error' && <Notice>{message}</Notice>}
 
-      {phase === 'ready' && (
+      {showPreview && (
         <>
           {!hasCustomerId && (
             <Notice>
@@ -175,6 +256,26 @@ function ImportPage() {
               <code>customer_id</code> and choose the file again.
             </Notice>
           )}
+          {importError && <Notice>{importError}</Notice>}
+
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={handleImport}
+              disabled={!hasCustomerId || phase === 'importing'}
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+            >
+              {phase === 'importing' && (
+                <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+              )}
+              {phase === 'importing' ? 'Importing…' : 'Import customers'}
+            </button>
+            <p className="mt-2 max-w-xl text-sm text-muted">
+              Customers that already exist in Nexus with the same ID are
+              updated. Empty cells never erase values Nexus already has.
+            </p>
+          </div>
+
           <ColumnMapping preview={preview} />
           {preview.sample_rows.length > 0 ? (
             <SampleRows preview={preview} />
@@ -185,6 +286,8 @@ function ImportPage() {
           )}
         </>
       )}
+
+      {phase === 'done' && <ImportResult result={result} />}
     </div>
   )
 }
