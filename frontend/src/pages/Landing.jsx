@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import Principles from '../components/landing/Principles'
 import ReasoningChain from '../components/landing/ReasoningChain'
 
 function Landing() {
@@ -45,7 +46,15 @@ function Landing() {
 
           <ReasoningChain />
         </section>
+
+        <Principles />
       </main>
+
+      <footer className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-muted">
+          Nexus AI. Customer retention intelligence, built step by step.
+        </div>
+      </footer>
     </div>
   )
 }
