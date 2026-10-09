@@ -1,7 +1,10 @@
-fastapi 
-uvicorn[standard] 
-pydantic-settings 
+fastapi
+uvicorn[standard]
+pydantic-settings
 sqlalchemy
-psycopg[binary] 
-alembic 
+psycopg[binary]
+alembic
 pandas
+python-multipart
+httpx
+pytest
