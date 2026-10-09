@@ -58,4 +58,21 @@ export async function importCustomersCsv(file) {
 
   if (!response.ok) throw new Error(await readErrorMessage(response))
   return response.json()
+} 
+
+
+export async function listImports(limit = 10) {
+  let response
+  try {
+    response = await fetch(
+      `${API_BASE_URL}/api/v1/customers/imports?limit=${limit}`,
+    )
+  } catch {
+    throw new Error(
+      "Can't reach the Nexus API. Make sure the backend is running.",
+    )
+  }
+
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
 }

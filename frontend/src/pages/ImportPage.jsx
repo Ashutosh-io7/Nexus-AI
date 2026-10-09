@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, FileUp, Loader2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { importCustomersCsv, previewCustomersCsv } from '../lib/api'
+import ImportHistory from '../components/import/ImportHistory'
 
 // Friendly names for the fields the backend can recognize.
 const FIELD_LABELS = {
@@ -165,6 +166,7 @@ function ImportResult({ result }) {
 function ImportPage() {
   const inputRef = useRef(null)
   const [state, setState] = useState({ phase: 'idle' })
+  const [historyVersion, setHistoryVersion] = useState(0)
 
   async function handleFileChange(event) {
     const input = event.target
@@ -198,6 +200,7 @@ function ImportPage() {
         importError: error.message,
       })
     }
+    setHistoryVersion((version) => version + 1)
   }
 
   const { phase, fileName, preview, result, message, importError } = state
@@ -287,7 +290,9 @@ function ImportPage() {
         </>
       )}
 
-      {phase === 'done' && <ImportResult result={result} />}
+      {phase === 'done' && <ImportResult result={result} />} 
+
+      <ImportHistory refreshKey={historyVersion} />
     </div>
   )
 }
