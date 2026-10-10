@@ -1,6 +1,5 @@
 import { Activity, Upload } from 'lucide-react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
-
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 const NAV_ITEMS = [
   { to: '/app/import', label: 'Import customers', icon: Upload },
   { to: '/app/status', label: 'System status', icon: Activity },
@@ -15,7 +14,8 @@ function navLinkClass({ isActive }) {
   ].join(' ')
 }
 
-function AppLayout() {
+function AppLayout() { 
+  const location = useLocation()
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
       <aside className="border-b border-line bg-surface lg:sticky lg:top-0 lg:h-screen lg:self-start lg:border-b-0 lg:border-r">
@@ -42,7 +42,9 @@ function AppLayout() {
       </aside>
 
       <main className="px-6 py-8 lg:px-10">
-        <Outlet />
+        <div key={location.pathname} className="motion-safe:animate-fade-in">
+          <Outlet />
+        </div>
       </main>
     </div>
   )

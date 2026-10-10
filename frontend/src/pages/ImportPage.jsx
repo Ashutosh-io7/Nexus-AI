@@ -36,7 +36,7 @@ function Notice({ children }) {
 
 function ColumnMapping({ preview }) {
   return (
-    <section className="mt-8">
+    <section className="mt-8 motion-safe:animate-fade-in">
       <h2 className="font-medium">How Nexus reads your columns</h2>
       <div className="mt-3 overflow-x-auto rounded-lg border border-line bg-surface">
         <table className="w-full text-left text-sm">
@@ -69,7 +69,7 @@ function ColumnMapping({ preview }) {
 
 function SampleRows({ preview }) {
   return (
-    <section className="mt-8">
+    <section className="mt-8 motion-safe:animate-fade-in">
       <h2 className="font-medium">
         First {preview.sample_rows.length}{' '}
         {preview.sample_rows.length === 1 ? 'row' : 'rows'}
@@ -116,7 +116,7 @@ function ImportResult({ result }) {
   return (
     <section
       aria-labelledby="result-heading"
-      className="mt-8 rounded-lg border border-line bg-surface p-5"
+      className="mt-8 rounded-lg border border-line bg-surface p-5 motion-safe:animate-fade-in"
     >
       <h2 id="result-heading" className="flex items-center gap-2 font-medium">
         {result.status === 'completed' && (

@@ -1,4 +1,4 @@
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { listImports } from '../../lib/api'
 
@@ -48,10 +48,15 @@ function ImportHistory({ refreshKey }) {
       </h2>
 
       {state.phase === 'loading' && (
-        <p role="status" className="mt-4 flex items-center gap-2 text-sm text-muted">
-          <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-          Loading history…
-        </p>
+        <div role="status" className="mt-4 space-y-2">
+          {[0, 1, 2].map((row) => (
+            <div
+              key={row}
+              className="h-11 rounded-lg bg-line motion-safe:animate-pulse"
+            />
+          ))}
+          <span className="sr-only">Loading history…</span>
+        </div>
       )}
 
       {state.phase === 'error' && (
@@ -93,7 +98,7 @@ function ImportHistory({ refreshKey }) {
             </thead>
             <tbody className="divide-y divide-line">
               {state.imports.map((item) => (
-                <tr key={item.id}>
+                <tr key={item.id} className="transition-colors hover:bg-paper">
                   <td className="px-4 py-2 font-medium">{item.filename}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-muted">
                     {formatWhen(item.created_at)}
