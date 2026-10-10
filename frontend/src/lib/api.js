@@ -76,3 +76,27 @@ export async function listImports(limit = 10) {
   if (!response.ok) throw new Error(await readErrorMessage(response))
   return response.json()
 }
+
+
+
+export async function listCustomers({ search, sortBy, sortDir, limit, offset }) {
+  const params = new URLSearchParams({
+    sort_by: sortBy,
+    sort_dir: sortDir,
+    limit: String(limit),
+    offset: String(offset),
+  })
+  if (search) params.set('search', search)
+
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}/api/v1/customers?${params}`)
+  } catch {
+    throw new Error(
+      "Can't reach the Nexus API. Make sure the backend is running.",
+    )
+  }
+
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
+}

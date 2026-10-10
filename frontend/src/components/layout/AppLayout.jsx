@@ -1,6 +1,8 @@
-import { Activity, Upload } from 'lucide-react'
+import { Activity, Upload, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+
 const NAV_ITEMS = [
+  { to: '/app/customers', label: 'Customers', icon: Users },
   { to: '/app/import', label: 'Import customers', icon: Upload },
   { to: '/app/status', label: 'System status', icon: Activity },
 ]

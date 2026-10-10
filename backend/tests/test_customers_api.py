@@ -1,5 +1,7 @@
 import io
 from fastapi import status
+from decimal import Decimal
+from app.models.customer import Customer
 
 
 def test_preview_endpoint(client):
@@ -54,3 +56,37 @@ CUST-20,Beta,beta@test.com,200.00,1
     detail_res = client.get(f"/api/v1/customers/imports/{import_id}")
     assert detail_res.status_code == status.HTTP_200_OK
     assert detail_res.json()["filename"] == "customers.csv"
+
+
+def test_list_customers_search_sort_and_paging(client, db_session):
+    db_session.add_all([
+        Customer(external_id="ZZT-1", full_name="Ada Test", monthly_revenue=Decimal("10.00")),
+        Customer(external_id="ZZT-2", full_name="Bo Test", monthly_revenue=Decimal("30.00")),
+        Customer(external_id="ZZT-3", full_name="Cy Test", monthly_revenue=Decimal("20.00")),
+    ])
+    db_session.flush()
+
+    # Search + sort by revenue, highest first
+    response = client.get("/api/v1/customers", params={
+        "search": "ZZT-", "sort_by": "monthly_revenue", "sort_dir": "desc",
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert [c["external_id"] for c in body["items"]] == ["ZZT-2", "ZZT-3", "ZZT-1"]
+
+    # Paging: second page of size 2 holds the last customer
+    response = client.get("/api/v1/customers", params={
+        "search": "ZZT-", "sort_by": "external_id", "sort_dir": "asc",
+        "limit": 2, "offset": 2,
+    })
+    body = response.json()
+    assert body["total"] == 3
+    assert [c["external_id"] for c in body["items"]] == ["ZZT-3"]
+
+    # % and _ typed in the search box are plain text, not wildcards
+    assert client.get("/api/v1/customers", params={"search": "ZZT-%"}).json()["total"] == 0
+    assert client.get("/api/v1/customers", params={"search": "ZZT_1"}).json()["total"] == 0
+
+    # Sorting by a column that is not allowed is rejected
+    assert client.get("/api/v1/customers", params={"sort_by": "email"}).status_code == 422
