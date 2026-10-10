@@ -1,5 +1,6 @@
 import csv
 import io
+import logging 
 import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -13,6 +14,8 @@ from app.models.customer import Customer
 from app.models.customer_import import CustomerImport
 from app.schemas.customer import CustomerCreate
 from app.schemas.customer_import import CSVPreviewResponse
+
+logger = logging.getLogger(__name__)
 
 
 # Canonical field aliases map: normalized source header -> model field name
@@ -109,8 +112,9 @@ def normalize_header(header: str) -> str:
     return re.sub(r"[\s\-_]+", "_", s)
 
 
+
 def parse_boolean(val: Any) -> Optional[bool]:
-    """Parse common boolean representations."""
+    """Parse common yes/no representations. Empty means unknown (None)."""
     if val is None or val == "":
         return None
     s = str(val).strip().lower()
@@ -118,7 +122,9 @@ def parse_boolean(val: Any) -> Optional[bool]:
         return True
     if s in ("0", "false", "f", "no", "n"):
         return False
-    return None
+    raise ValueError(
+        f"Invalid yes/no value: '{val}'. Use yes/no, true/false or 1/0."
+    )
 
 
 def parse_decimal(val: Any) -> Optional[Decimal]:
@@ -129,22 +135,29 @@ def parse_decimal(val: Any) -> Optional[Decimal]:
     if not s:
         return None
     try:
-        return Decimal(s)
+        number = Decimal(s)
     except (InvalidOperation, ValueError):
         raise ValueError(f"Invalid numeric decimal value: '{val}'")
+    if not number.is_finite():  # rejects NaN and Infinity
+        raise ValueError(f"Invalid numeric decimal value: '{val}'")
+    return number
 
 
 def parse_integer(val: Any) -> Optional[int]:
-    """Safely parse integer string."""
+    """Safely parse a whole number. Values like 3.7 are rejected, not rounded."""
     if val is None or val == "":
         return None
     s = str(val).strip().replace(",", "")
     if not s:
         return None
     try:
-        return int(float(s))
-    except ValueError:
+        number = Decimal(s)
+    except (InvalidOperation, ValueError):
         raise ValueError(f"Invalid integer value: '{val}'")
+    if not number.is_finite() or number != number.to_integral_value():
+        raise ValueError(f"Invalid integer value: '{val}'. Expected a whole number.")
+    return int(number)
+
 
 
 def parse_datetime(val: Any) -> Optional[datetime]:
@@ -273,8 +286,11 @@ class IngestionService:
         db.commit()
         db.refresh(import_job)
 
+        job_id = import_job.id  # NEW
+
         errors: list[dict[str, Any]] = []
         valid_records: list[dict[str, Any]] = []
+        seen_ids: dict[str, int] = {}  # NEW: customer ID -> first row it appeared on
         row_number = 1  # 1-indexed, header was row 1
 
         for raw_row in reader:
@@ -339,6 +355,17 @@ class IngestionService:
 
                 # Validate with Pydantic, keeping only the fields we actually set
                 validated_model = CustomerCreate(**transformed_data)
+
+                # NEW: same customer ID twice in one file. The first row wins,
+                # later rows are reported instead of silently overwriting it.
+                customer_id = transformed_data["external_id"]
+                if customer_id in seen_ids:
+                    raise ValueError(
+                        f"Duplicate customer ID '{customer_id}' "
+                        f"(already used on row {seen_ids[customer_id]}). Row skipped."
+                    )
+                seen_ids[customer_id] = row_number
+
                 valid_records.append(validated_model.model_dump(exclude_unset=True))
 
             except Exception as exc:
@@ -351,44 +378,66 @@ class IngestionService:
         inserted_count = 0
         updated_count = 0
 
-        if valid_records:
-            # We determine which external_ids already exist to accurately count inserted vs updated
-            ext_ids = [r["external_id"] for r in valid_records]
-            existing_ids_result = db.query(Customer.external_id).filter(
-                Customer.external_id.in_(ext_ids)
-            ).all()
-            existing_set = {row[0] for row in existing_ids_result}
+        try:  # NEW: everything that writes to the database is inside this try
+            if valid_records:
+                # We determine which external_ids already exist to accurately count inserted vs updated
+                ext_ids = [r["external_id"] for r in valid_records]
+                existing_ids_result = db.query(Customer.external_id).filter(
+                    Customer.external_id.in_(ext_ids)
+                ).all()
+                existing_set = {row[0] for row in existing_ids_result}
 
-            for record in valid_records:
-                is_update = record["external_id"] in existing_set
-                
-                stmt = pg_insert(Customer).values(**record)
+                for record in valid_records:
+                    is_update = record["external_id"] in existing_set
 
-                # On conflict, update only the columns this CSV actually provided
-                update_dict = {
-                    key: value
-                    for key, value in record.items()
-                    if key not in ("external_id", "source_attributes")
+                    stmt = pg_insert(Customer).values(**record)
+
+                    # On conflict, update only the columns this CSV actually provided
+                    update_dict = {
+                        key: value
+                        for key, value in record.items()
+                        if key not in ("external_id", "source_attributes")
+                    }
+                    # Merge new source attributes into the existing ones
+                    update_dict["source_attributes"] = Customer.source_attributes.op("||")(
+                        stmt.excluded.source_attributes
+                    )
+                    update_dict["updated_at"] = func.now()
+
+                    upsert_stmt = stmt.on_conflict_do_update(
+                        index_elements=[Customer.external_id],
+                        set_=update_dict
+                    )
+                    db.execute(upsert_stmt)
+
+                    if is_update:
+                        updated_count += 1
+                    else:
+                        inserted_count += 1
+                        existing_set.add(record["external_id"])
+
+                db.commit()
+        except Exception:  # NEW
+            # Undo this import's changes so nothing is left half-saved, then
+            # record the failure instead of leaving the job on "processing".
+            db.rollback()
+            logger.exception("Customer import %s failed while saving", job_id)
+            total_rows = len(valid_records) + len(errors)
+            import_job.total_rows = total_rows
+            import_job.inserted_count = 0
+            import_job.updated_count = 0
+            import_job.failed_count = total_rows
+            import_job.error_summary = [
+                {
+                    "row": 0,
+                    "error": "Saving to the database failed. Nothing from this file was saved.",
                 }
-                # Merge new source attributes into the existing ones
-                update_dict["source_attributes"] = Customer.source_attributes.op("||")(
-                    stmt.excluded.source_attributes
-                )
-                update_dict["updated_at"] = func.now()
-
-                upsert_stmt = stmt.on_conflict_do_update(
-                    index_elements=[Customer.external_id],
-                    set_=update_dict
-                )
-                db.execute(upsert_stmt)
-
-                if is_update:
-                    updated_count += 1
-                else:
-                    inserted_count += 1
-                    existing_set.add(record["external_id"])
-
+            ]
+            import_job.status = "failed"
+            import_job.completed_at = datetime.now(timezone.utc)
             db.commit()
+            db.refresh(import_job)
+            return import_job
 
         # Update import job stats
         import_job.total_rows = len(valid_records) + len(errors)

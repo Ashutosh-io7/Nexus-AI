@@ -171,3 +171,33 @@ CUST-100,95.00,,west
     assert c.email == "dana@example.com"          # empty cell -> kept
     assert c.churned is True                      # column missing -> kept
     assert c.source_attributes == {"vip_status": "gold", "region": "west"}  # merged
+
+
+def test_strict_value_parsing():
+    with pytest.raises(ValueError):
+        parse_boolean("maybe")
+    with pytest.raises(ValueError):
+        parse_integer("3.7")
+    with pytest.raises(ValueError):
+        parse_decimal("NaN")
+    assert parse_integer("1e3") == 1000
+
+
+def test_invalid_churn_and_duplicate_ids_are_reported(db_session):
+    csv_text = """customer_id,monthly_revenue,churned
+D-1,10.00,yes
+D-2,20.00,maybe
+D-1,30.00,no
+"""
+    job = IngestionService.process_and_ingest(
+        db=db_session, filename="dupes.csv", content=csv_text
+    )
+    assert job.inserted_count == 1
+    assert job.failed_count == 2
+
+    errors = {item["row"]: item["error"] for item in job.error_summary}
+    assert "yes/no" in errors[3].lower()          # D-2 with "maybe"
+    assert "Duplicate customer ID 'D-1'" in errors[4]
+
+    saved = db_session.query(Customer).filter_by(external_id="D-1").one()
+    assert saved.monthly_revenue == Decimal("10.00")  # first row wins

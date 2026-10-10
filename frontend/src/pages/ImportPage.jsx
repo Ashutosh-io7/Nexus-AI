@@ -150,7 +150,8 @@ function ImportResult({ result }) {
           <ul className="mt-2 space-y-1 text-sm">
             {shownErrors.map((item) => (
               <li key={item.row}>
-                Row {item.row}: {item.error}
+                {item.row ? `Row ${item.row}: ` : ''}
+                {item.error}
               </li>
             ))}
           </ul>
