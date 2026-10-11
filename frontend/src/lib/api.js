@@ -100,3 +100,25 @@ export async function listCustomers({ search, sortBy, sortDir, limit, offset }) 
   if (!response.ok) throw new Error(await readErrorMessage(response))
   return response.json()
 }
+
+
+export async function getCustomer(id) {
+  let response
+  try {
+    response = await fetch(
+      `${API_BASE_URL}/api/v1/customers/${encodeURIComponent(id)}`,
+    )
+  } catch {
+    throw new Error(
+      "Can't reach the Nexus API. Make sure the backend is running.",
+    )
+  }
+
+  if (response.status === 404) {
+    const error = new Error('Customer not found.')
+    error.notFound = true
+    throw error
+  }
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
+}

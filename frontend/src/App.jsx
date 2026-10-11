@@ -4,6 +4,7 @@ import ImportPage from './pages/ImportPage'
 import Landing from './pages/Landing'
 import StatusPage from './pages/StatusPage'
 import CustomersPage from './pages/CustomersPage'
+import CustomerProfilePage from './pages/CustomerProfilePage'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/app" element={<AppLayout />}>
           <Route index element={<Navigate to="/app/customers" replace />} />
           <Route path="customers" element={<CustomersPage />} />
+          <Route path="customers/:customerId" element={<CustomerProfilePage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="status" element={<StatusPage />} />
         </Route>

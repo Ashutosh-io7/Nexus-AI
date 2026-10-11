@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listCustomers } from '../lib/api'
+import { formatDate, formatMoney, outcomeLabel } from '../lib/format' 
 
 const PAGE_SIZE = 25
 
@@ -29,26 +30,6 @@ function Missing() {
   )
 }
 
-function formatMoney(value) {
-  return Number(value).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-function formatDate(isoString) {
-  return new Date(isoString).toLocaleDateString(undefined, {
-    dateStyle: 'medium',
-  })
-}
-
-// "churned" is a past outcome from the customer's own data, not a prediction.
-// An empty value means unknown, which is different from "stayed".
-function outcomeLabel(churned) {
-  if (churned === true) return 'Left'
-  if (churned === false) return 'Stayed'
-  return 'Unknown'
-}
 
 function SortableHeader({ column, query, onSort }) {
   const active = query.sortBy === column.key
@@ -294,9 +275,12 @@ function CustomersPage() {
                     className="transition-colors hover:bg-paper"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium">
+                      <Link
+                        to={`/app/customers/${customer.id}`}
+                        className="font-medium hover:text-accent hover:underline"
+                      >
                         {customer.full_name || customer.external_id}
-                      </div>
+                      </Link>
                       {customer.full_name && (
                         <div className="text-xs text-muted">
                           {customer.external_id}

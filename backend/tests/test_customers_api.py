@@ -89,4 +89,21 @@ def test_list_customers_search_sort_and_paging(client, db_session):
     assert client.get("/api/v1/customers", params={"search": "ZZT_1"}).json()["total"] == 0
 
     # Sorting by a column that is not allowed is rejected
-    assert client.get("/api/v1/customers", params={"sort_by": "email"}).status_code == 422
+    assert client.get("/api/v1/customers", params={"sort_by": "email"}).status_code == 422 
+
+
+def test_get_customer_by_id(client, db_session):
+    customer = Customer(external_id="ZZT-PROFILE", full_name="Profile Test", logins_last_30d=0)
+    db_session.add(customer)
+    db_session.flush()
+
+    response = client.get(f"/api/v1/customers/{customer.id}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["external_id"] == "ZZT-PROFILE"
+    assert body["logins_last_30d"] == 0   # a real zero stays a zero
+    assert body["email"] is None          # a missing value stays missing
+
+    assert client.get("/api/v1/customers/999999999").status_code == 404
+    # The new route must not swallow the older /imports route
+    assert client.get("/api/v1/customers/imports").status_code == 200

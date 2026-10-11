@@ -200,4 +200,16 @@ def list_customers(
         total=total,
         limit=limit,
         offset=offset,
-    )
+    ) 
+
+
+@router.get(
+    "/{customer_id}",
+    response_model=CustomerResponse,
+    summary="Get one customer"
+)
+def get_customer(customer_id: int, db: Session = Depends(get_db)):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found.")
+    return customer
