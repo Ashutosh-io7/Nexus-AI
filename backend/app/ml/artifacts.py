@@ -16,6 +16,10 @@ from app.ml.training import TrainingResult
 DEFAULT_MODELS_DIR = Path(__file__).resolve().parents[2] / "models_store" / "churn"
 
 
+class ModelUnusableError(RuntimeError):
+    """A saved model exists but cannot be used (for example, it is too old)."""
+
+
 def save_model(result: TrainingResult, base_dir: Optional[Path] = None) -> Path:
     base_dir = Path(base_dir or DEFAULT_MODELS_DIR)
     version = result.metadata["version"]
@@ -27,6 +31,7 @@ def save_model(result: TrainingResult, base_dir: Optional[Path] = None) -> Path:
             "pipeline": result.pipeline,
             "feature_spec": asdict(result.spec),
             "metadata": result.metadata,
+            "training_customer_ids": result.training_customer_ids,
         },
         target / "model.joblib",
     )
@@ -37,20 +42,34 @@ def save_model(result: TrainingResult, base_dir: Optional[Path] = None) -> Path:
     return target
 
 
+def current_model_version(base_dir: Optional[Path] = None) -> Optional[str]:
+    """The current model's version, read without loading the model itself."""
+    pointer = Path(base_dir or DEFAULT_MODELS_DIR) / "CURRENT"
+    if not pointer.exists():
+        return None
+    return pointer.read_text(encoding="utf-8").strip() or None
+
+
 def load_current_model(base_dir: Optional[Path] = None) -> Optional[dict[str, Any]]:
     """Return the current model, or None when no model has been trained yet."""
     base_dir = Path(base_dir or DEFAULT_MODELS_DIR)
-    pointer = base_dir / "CURRENT"
-    if not pointer.exists():
+    version = current_model_version(base_dir)
+    if version is None:
         return None
 
-    model_file = base_dir / pointer.read_text(encoding="utf-8").strip() / "model.joblib"
+    model_file = base_dir / version / "model.joblib"
     if not model_file.exists():
         return None
 
     stored = joblib.load(model_file)
+    if "training_customer_ids" not in stored:
+        raise ModelUnusableError(
+            "The saved model is from an older version of Nexus. "
+            "Train it again with: python -m app.ml.train_cli"
+        )
     return {
         "pipeline": stored["pipeline"],
         "feature_spec": FeatureSpec(**stored["feature_spec"]),
         "metadata": stored["metadata"],
+        "training_customer_ids": set(stored["training_customer_ids"]),
     }

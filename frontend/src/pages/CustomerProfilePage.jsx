@@ -1,15 +1,10 @@
 import { AlertCircle, ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getCustomer } from '../lib/api'
-import { formatDate, formatMoney, outcomeLabel } from '../lib/format'
+import { getCustomer, getCustomerPrediction } from '../lib/api'
+import { formatDate, formatMoney, formatPercent, outcomeLabel } from '../lib/format'
 
 const INTELLIGENCE = [
-  {
-    kind: 'Predicted',
-    title: 'Churn risk',
-    text: 'Needs a model trained on past customers with known outcomes.',
-  },
   {
     kind: 'Explained',
     title: 'Why',
@@ -63,6 +58,95 @@ function BackLink() {
     </Link>
   )
 }
+
+
+const RISK_STYLE = {
+  high: { label: 'High risk', className: 'text-risk-high' },
+  medium: { label: 'Medium risk', className: 'text-risk-medium' },
+  low: { label: 'Low risk', className: 'text-ink' },
+}
+
+function ChurnRiskItem({ customerId }) {
+  const [state, setState] = useState({ phase: 'loading' })
+
+  useEffect(() => {
+    let cancelled = false
+    getCustomerPrediction(customerId)
+      .then((data) => {
+        if (!cancelled) setState({ phase: 'ready', data })
+      })
+      .catch((error) => {
+        if (!cancelled) setState({ phase: 'error', message: error.message })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [customerId])
+
+  let body
+  if (state.phase === 'loading') {
+    body = <div className="mt-2 h-10 rounded bg-line motion-safe:animate-pulse" />
+  } else if (state.phase === 'error') {
+    body = (
+      <p className="mt-1 text-sm text-muted">
+        <span className="font-medium text-ink">Could not load.</span>{' '}
+        {state.message}
+      </p>
+    )
+  } else if (!state.data.available) {
+    body = (
+      <p className="mt-1 text-sm text-muted">
+        <span className="font-medium text-ink">Not available yet.</span>{' '}
+        {state.data.message}
+      </p>
+    )
+  } else {
+    const prediction = state.data
+    const style = RISK_STYLE[prediction.risk_level] ?? RISK_STYLE.low
+    const percent =
+      prediction.churn_probability < 0.01
+        ? '<1%'
+        : formatPercent(prediction.churn_probability)
+
+    body = (
+      <div className="mt-2">
+        <p className="flex items-baseline gap-2">
+          <span className="font-display text-3xl font-medium">{percent}</span>
+          <span className={`text-sm font-medium ${style.className}`}>
+            {style.label}
+          </span>
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          Estimated chance this customer leaves. A model estimate, not a
+          certainty.
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          Model {prediction.model_version} · {formatDate(prediction.predicted_at)}
+        </p>
+        {prediction.in_training_data && (
+          <p className="mt-2 text-xs text-muted">
+            This customer was part of the data the model learned from, so the
+            estimate can look more confident than it should.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <li className="py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-medium">Churn risk</h3>
+        <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-muted">
+          Predicted
+        </span>
+      </div>
+      {body}
+    </li>
+  )
+}
+
+
 
 function CustomerProfilePage() {
   const { customerId } = useParams()
@@ -251,10 +335,11 @@ function CustomerProfilePage() {
             Intelligence
           </h2>
           <p className="mt-1 text-sm text-muted">
-            These appear as Nexus gains the data and models to support them.
-            Nothing here is estimated.
+            Each item says where it comes from. Anything Nexus cannot support
+            yet says so instead of guessing.
           </p>
           <ul className="mt-4 divide-y divide-line">
+            <ChurnRiskItem customerId={customer.id} />
             {INTELLIGENCE.map((item) => (
               <li key={item.title} className="py-3">
                 <div className="flex items-baseline justify-between gap-3">

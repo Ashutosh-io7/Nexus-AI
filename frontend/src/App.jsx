@@ -5,6 +5,7 @@ import Landing from './pages/Landing'
 import StatusPage from './pages/StatusPage'
 import CustomersPage from './pages/CustomersPage'
 import CustomerProfilePage from './pages/CustomerProfilePage'
+import ModelPage from './pages/ModelPage'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="customers/:customerId" element={<CustomerProfilePage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="status" element={<StatusPage />} />
+          <Route path="model" element={<ModelPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

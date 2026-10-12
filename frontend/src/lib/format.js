@@ -18,3 +18,7 @@ export function outcomeLabel(churned) {
   if (churned === false) return 'Stayed'
   return 'Unknown'
 }
+
+export function formatPercent(value, digits = 0) {
+  return `${(value * 100).toFixed(digits)}%`
+}

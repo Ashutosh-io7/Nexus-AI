@@ -28,7 +28,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 
-from app.ml.features import FeatureSpec, infer_feature_spec, prepare_matrix
+from app.ml.features import ID_COLUMN, FeatureSpec, infer_feature_spec, prepare_matrix
 
 MIN_LABELED_ROWS = 200
 MIN_PER_CLASS = 30
@@ -49,6 +49,7 @@ class TrainingResult:
     pipeline: Pipeline
     spec: FeatureSpec
     metadata: dict[str, Any]
+    training_customer_ids: list[int]  # customers the model learned from
 
 
 def build_preprocessor(spec: FeatureSpec) -> ColumnTransformer:
@@ -212,4 +213,9 @@ def train_churn_model(
             "numpy": np.__version__,
         },
     }
-    return TrainingResult(pipeline=pipelines[selected], spec=spec, metadata=metadata)
+    return TrainingResult(
+        pipeline=pipelines[selected], 
+        spec=spec, 
+        metadata=metadata,
+        training_customer_ids=[int(i) for i in frame_train[ID_COLUMN]],
+        )

@@ -122,3 +122,30 @@ export async function getCustomer(id) {
   if (!response.ok) throw new Error(await readErrorMessage(response))
   return response.json()
 }
+
+async function apiRequest(path, options) {
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, options)
+  } catch {
+    throw new Error(
+      "Can't reach the Nexus API. Make sure the backend is running.",
+    )
+  }
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
+}
+
+export function getChurnModel() {
+  return apiRequest('/api/v1/churn/model')
+}
+
+export function runChurnPredictions() {
+  return apiRequest('/api/v1/churn/predictions', { method: 'POST' })
+}
+
+export function getCustomerPrediction(customerId) {
+  return apiRequest(
+    `/api/v1/churn/customers/${encodeURIComponent(customerId)}`,
+  )
+}
