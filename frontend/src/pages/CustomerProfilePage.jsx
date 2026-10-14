@@ -1,15 +1,14 @@
-import { AlertCircle, ArrowLeft } from 'lucide-react'
+import { AlertCircle, ArrowDown, ArrowLeft, ArrowUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getCustomer, getCustomerPrediction } from '../lib/api'
+import {
+  getCustomer,
+  getCustomerExplanation,
+  getCustomerPrediction,
+} from '../lib/api'
 import { formatDate, formatMoney, formatPercent, outcomeLabel } from '../lib/format'
 
 const INTELLIGENCE = [
-  {
-    kind: 'Explained',
-    title: 'Why',
-    text: 'Explanations come from the churn model, so they follow it.',
-  },
   {
     kind: 'Retrieved',
     title: 'Support history',
@@ -146,6 +145,118 @@ function ChurnRiskItem({ customerId }) {
   )
 }
 
+
+function percentLabel(probability) {
+  return probability < 0.01 ? '<1%' : formatPercent(probability)
+}
+
+function WhyItem({ customerId }) {
+  const [state, setState] = useState({ phase: 'loading' })
+
+  useEffect(() => {
+    let cancelled = false
+    getCustomerExplanation(customerId)
+      .then((data) => {
+        if (!cancelled) setState({ phase: 'ready', data })
+      })
+      .catch((error) => {
+        if (!cancelled) setState({ phase: 'error', message: error.message })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [customerId])
+
+  let body
+  if (state.phase === 'loading') {
+    body = <div className="mt-2 h-24 rounded bg-line motion-safe:animate-pulse" />
+  } else if (state.phase === 'error') {
+    body = (
+      <p className="mt-1 text-sm text-muted">
+        <span className="font-medium text-ink">Could not load.</span>{' '}
+        {state.message}
+      </p>
+    )
+  } else if (!state.data.available) {
+    body = (
+      <p className="mt-1 text-sm text-muted">
+        <span className="font-medium text-ink">Not available yet.</span>{' '}
+        {state.data.message}
+      </p>
+    )
+  } else {
+    const explanation = state.data
+    const maxImpact = Math.max(
+      ...explanation.contributions.map((item) => Math.abs(item.impact)),
+      0.0001,
+    )
+
+    body = (
+      <div className="mt-2">
+        <p className="text-sm text-muted">
+          Across the customers the model learned from, the average estimate is{' '}
+          {percentLabel(explanation.average_probability)}. For this customer it
+          is {percentLabel(explanation.probability)}. These are the factors
+          that moved it:
+        </p>
+
+        <ul className="mt-3 space-y-3">
+          {explanation.contributions.map((item) => {
+            const raises = item.direction === 'raises'
+            const Icon = raises ? ArrowUp : ArrowDown
+            const width = Math.max(4, (Math.abs(item.impact) / maxImpact) * 100)
+
+            return (
+              <li key={item.feature}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span>
+                    <span className="font-medium">{item.label}</span>{' '}
+                    <span className="text-muted">{item.value}</span>
+                  </span>
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-1 text-xs font-medium ${raises ? 'text-risk-high' : 'text-accent'}`}
+                  >
+                    <Icon size={12} aria-hidden="true" />
+                    {raises ? 'Raises risk' : 'Lowers risk'}
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 rounded-full bg-paper" aria-hidden="true">
+                  <div
+                    className={`h-full rounded-full ${raises ? 'bg-risk-high' : 'bg-accent'}`}
+                    style={{ width: `${width}%` }}
+                  />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+
+        {explanation.other_count > 0 && (
+          <p className="mt-3 text-xs text-muted">
+            {explanation.other_count} other factors together{' '}
+            {explanation.other_impact > 0 ? 'raise' : 'lower'} the estimate.
+          </p>
+        )}
+        <p className="mt-3 text-xs text-muted">
+          This shows what the model&apos;s estimate is based on. It does not
+          prove why this customer might leave.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <li className="py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-medium">Why</h3>
+        <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-muted">
+          Explained
+        </span>
+      </div>
+      {body}
+    </li>
+  )
+}
 
 
 function CustomerProfilePage() {
@@ -340,6 +451,7 @@ function CustomerProfilePage() {
           </p>
           <ul className="mt-4 divide-y divide-line">
             <ChurnRiskItem customerId={customer.id} />
+            <WhyItem customerId={customer.id} />
             {INTELLIGENCE.map((item) => (
               <li key={item.title} className="py-3">
                 <div className="flex items-baseline justify-between gap-3">

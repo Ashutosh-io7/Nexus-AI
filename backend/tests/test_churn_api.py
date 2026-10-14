@@ -12,6 +12,7 @@ from app.ml.predictor import eligible_customers, risk_level, score_customers
 from app.ml.training import train_churn_model
 from app.models.churn_prediction import ChurnPrediction
 from app.models.customer import Customer
+from app.ml.explain import build_explainer, explain_customer
 
 
 def make_customers(n=360):
@@ -125,3 +126,72 @@ def test_model_status_reports_real_metrics(client, monkeypatch, tmp_path):
     assert body["version"] == result.metadata["version"]
     assert body["labeled_customers"] == 360
     assert 0.0 <= body["test_metrics"]["roc_auc"] <= 1.0
+
+
+def test_explanations_add_up_to_the_prediction(tmp_path):
+    customers = make_customers()
+    for position, customer in enumerate(customers, start=1):
+        customer.id = position  # never stored in the database, only used to train
+    result = train_churn_model(customers_to_frame(customers), labels_of(customers))
+    save_model(result, base_dir=tmp_path)
+    explainer = build_explainer(load_current_model(tmp_path), customers[:100])
+
+    for customer in customers[:30]:
+        out = explain_customer(explainer, customer)
+        total = (
+            out["base_log_odds"]
+            + sum(item["impact"] for item in out["contributions"])
+            + out["other_impact"]
+        )
+        logit = float(np.log(out["probability"] / (1 - out["probability"])))
+        assert abs(total - logit) < 1e-4  # SHAP contributions add up to the prediction
+        assert all(item["direction"] in ("raises", "lowers") for item in out["contributions"])
+
+    # A short-tenure, month-to-month customer: tenure or contract should lead
+    risky = Customer(
+        id=9001,
+        tenure_months=2,
+        monthly_revenue=Decimal("60"),
+        source_attributes={"Contract": "Month-to-month"},
+    )
+    top = explain_customer(explainer, risky)["contributions"][0]
+    assert top["label"] in ("Tenure (months)", "Contract")
+    assert top["direction"] == "raises"
+
+
+def test_explanation_endpoint(client, db_session, monkeypatch, tmp_path):
+    customers = make_customers()
+    db_session.add_all(customers)
+    db_session.flush()
+    result = train_churn_model(customers_to_frame(customers), labels_of(customers))
+    save_model(result, base_dir=tmp_path)
+    monkeypatch.setattr(artifacts, "DEFAULT_MODELS_DIR", tmp_path)
+
+    stayed = next(c for c in customers if not c.churned)
+    url = f"/api/v1/churn/customers/{stayed.id}/explanation"
+
+    body = client.get(url).json()  # not scored yet: nothing to explain
+    assert body["available"] is False
+    assert "No estimate yet" in body["message"]
+
+    score_customers(db_session, [stayed], load_current_model(tmp_path))
+    body = client.get(url).json()
+    assert body["available"] is True
+    assert body["contributions"]
+    assert 0.0 <= body["probability"] <= 1.0
+
+    left = next(c for c in customers if c.churned)
+    body = client.get(f"/api/v1/churn/customers/{left.id}/explanation").json()
+    assert body["available"] is False
+    assert "already left" in body["message"]
+
+
+def test_explanation_without_a_model(client, db_session, monkeypatch, tmp_path):
+    monkeypatch.setattr(artifacts, "DEFAULT_MODELS_DIR", tmp_path)  # empty: no model
+    customer = Customer(external_id="ZZP-NOEXPLAIN")
+    db_session.add(customer)
+    db_session.flush()
+
+    body = client.get(f"/api/v1/churn/customers/{customer.id}/explanation").json()
+    assert body["available"] is False
+    assert "No model" in body["message"]

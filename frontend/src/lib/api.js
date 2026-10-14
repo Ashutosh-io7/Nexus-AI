@@ -149,3 +149,9 @@ export function getCustomerPrediction(customerId) {
     `/api/v1/churn/customers/${encodeURIComponent(customerId)}`,
   )
 }
+
+export function getCustomerExplanation(customerId) {
+  return apiRequest(
+    `/api/v1/churn/customers/${encodeURIComponent(customerId)}/explanation`,
+  )
+}

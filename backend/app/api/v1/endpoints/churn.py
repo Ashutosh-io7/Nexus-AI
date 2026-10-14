@@ -10,6 +10,7 @@ from app.ml.artifacts import (
     current_model_version,
     load_current_model,
 )
+from app.ml.explain import ExplanationUnavailable, explain_customer, get_explainer
 from app.ml.predictor import (
     HIGH_RISK_CUTOFF,
     MEDIUM_RISK_CUTOFF,
@@ -19,7 +20,9 @@ from app.ml.predictor import (
 from app.models.churn_prediction import ChurnPrediction
 from app.models.customer import Customer
 from app.schemas.churn import (
+    CustomerExplanationResponse,
     CustomerPredictionResponse,
+    FeatureContribution,
     ModelMetrics,
     ModelStatusResponse,
     PredictionRunResponse,
@@ -131,4 +134,52 @@ def get_customer_prediction(customer_id: int, db: Session = Depends(get_db)):
         model_version=prediction.model_version,
         predicted_at=prediction.predicted_at,
         in_training_data=prediction.in_training_data,
+    )
+
+
+@router.get(
+    "/customers/{customer_id}/explanation",
+    response_model=CustomerExplanationResponse,
+    summary="Why the model gave this customer's estimate (SHAP)",
+)
+def get_customer_explanation(customer_id: int, db: Session = Depends(get_db)):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found.")
+
+    if customer.churned is True:
+        return CustomerExplanationResponse(
+            available=False,
+            message="This customer has already left, so no risk estimate is made.",
+        )
+
+    try:
+        explainer = get_explainer(db)
+    except (ModelUnusableError, ExplanationUnavailable) as exc:
+        return CustomerExplanationResponse(available=False, message=str(exc))
+    if explainer is None:
+        return CustomerExplanationResponse(available=False, message=NO_MODEL_MESSAGE)
+
+    # Only explain estimates that exist, so this always matches the risk card.
+    has_estimate = db.scalar(
+        select(ChurnPrediction.id).where(
+            ChurnPrediction.customer_id == customer_id,
+            ChurnPrediction.model_version == explainer.version,
+        )
+    )
+    if has_estimate is None:
+        return CustomerExplanationResponse(
+            available=False,
+            message="No estimate yet. Score customers from the Model page.",
+        )
+
+    result = explain_customer(explainer, customer)
+    return CustomerExplanationResponse(
+        available=True,
+        model_version=result["model_version"],
+        probability=result["probability"],
+        average_probability=result["average_probability"],
+        contributions=[FeatureContribution(**item) for item in result["contributions"]],
+        other_impact=result["other_impact"],
+        other_count=result["other_count"],
     )

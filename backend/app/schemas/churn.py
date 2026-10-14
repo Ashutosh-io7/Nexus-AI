@@ -44,3 +44,22 @@ class CustomerPredictionResponse(BaseModel):
     model_version: Optional[str] = None
     predicted_at: Optional[datetime] = None
     in_training_data: Optional[bool] = None
+
+
+class FeatureContribution(BaseModel):
+    feature: str
+    label: str
+    value: str
+    impact: float      # log-odds units: a bigger size means a stronger push
+    direction: str     # "raises" or "lowers" this customer's estimated risk
+
+
+class CustomerExplanationResponse(BaseModel):
+    available: bool
+    message: Optional[str] = None
+    model_version: Optional[str] = None
+    probability: Optional[float] = None
+    average_probability: Optional[float] = None
+    contributions: list[FeatureContribution] = []
+    other_impact: Optional[float] = None
+    other_count: Optional[int] = None
