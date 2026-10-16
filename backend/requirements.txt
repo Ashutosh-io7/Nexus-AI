@@ -12,3 +12,6 @@ scikit-learn==1.9.1
 xgboost==3.4.1
 shap==0.53.0
 pgvector>=0.3.0
+google-generativeai>=0.8.0
+pypdf>=4.0.0
+reportlab>=4.0.0

@@ -12,9 +12,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-# Standard embedding dimension (1536 for OpenAI text-embedding-3-small, 384 for MiniLM)
-# 1536 is standard across OpenAI and modern small embedding models.
-EMBEDDING_DIM = 1536
+# Standard embedding dimension for Google Gemini (text-embedding-004)
+EMBEDDING_DIM = 768
 
 
 class PlaybookDocument(Base):

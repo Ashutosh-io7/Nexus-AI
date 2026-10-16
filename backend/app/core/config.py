@@ -9,7 +9,11 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings): 
     app_env: str = "development"
     database_url: str 
-    cors_origins: str = "http://localhost:5173" 
+    cors_origins: str = "http://localhost:5173"
+
+    gemini_api_key: str | None = None
+    gemini_embedding_model: str = "models/gemini-embedding-001"
+    gemini_llm_model: str = "gemini-1.5-flash"
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
