@@ -6,6 +6,7 @@ import StatusPage from './pages/StatusPage'
 import CustomersPage from './pages/CustomersPage'
 import CustomerProfilePage from './pages/CustomerProfilePage'
 import ModelPage from './pages/ModelPage'
+import PlaybookPage from './pages/PlaybookPage'
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="import" element={<ImportPage />} />
           <Route path="status" element={<StatusPage />} />
           <Route path="model" element={<ModelPage />} />
+          <Route path="playbook" element={<PlaybookPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -155,3 +155,28 @@ export function getCustomerExplanation(customerId) {
     `/api/v1/churn/customers/${encodeURIComponent(customerId)}/explanation`,
   )
 }
+
+export async function getPlaybookStatus() {
+  const response = await fetch(`${API_BASE_URL}/api/v1/playbook/status`)
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
+}
+
+export async function uploadPlaybookPdf(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/playbook/upload`, {
+    method: 'POST',
+    body: formData,
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
+}
+
+export async function searchPlaybook(query) {
+  const params = new URLSearchParams({ query })
+  const response = await fetch(`${API_BASE_URL}/api/v1/playbook/search?${params}`)
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
+}
