@@ -63,3 +63,25 @@ class CustomerExplanationResponse(BaseModel):
     contributions: list[FeatureContribution] = []
     other_impact: Optional[float] = None
     other_count: Optional[int] = None
+
+class SimilarCustomerItem(BaseModel):
+    id: int
+    external_id: str
+    name: Optional[str] = None
+    subscription_plan: Optional[str] = None
+    tenure_months: Optional[int] = None
+    monthly_revenue: Optional[float] = None
+    churned: Optional[bool] = None
+    similarity_score: float
+
+
+class CustomerCohortResponse(BaseModel):
+    available: bool
+    message: Optional[str] = None
+    total_similar: int = 0
+    churned_count: int = 0
+    retained_count: int = 0
+    historical_churn_rate: Optional[float] = None
+    avg_tenure_months: Optional[float] = None
+    avg_monthly_revenue: Optional[float] = None
+    similar_customers: list[SimilarCustomerItem] = []

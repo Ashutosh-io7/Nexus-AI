@@ -13,6 +13,7 @@ from app.ml.training import train_churn_model
 from app.models.churn_prediction import ChurnPrediction
 from app.models.customer import Customer
 from app.ml.explain import build_explainer, explain_customer
+from app.ml.cohort import build_cohort_index, find_similar_cohort
 
 
 def make_customers(n=360):
@@ -195,3 +196,44 @@ def test_explanation_without_a_model(client, db_session, monkeypatch, tmp_path):
     body = client.get(f"/api/v1/churn/customers/{customer.id}/explanation").json()
     assert body["available"] is False
     assert "No model" in body["message"]
+
+
+
+
+def test_similar_cohort_calculation(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(artifacts, "DEFAULT_MODELS_DIR", tmp_path)
+
+    # train_churn_model requires at least 200 customers
+    customers = make_customers(360)
+    db_session.add_all(customers)
+    db_session.flush()
+
+    df = customers_to_frame(customers)
+    y = labels_of(customers)
+    result = train_churn_model(df, y, random_state=42)
+    save_model(result, base_dir=tmp_path)
+
+    # Pick one customer to find peers for
+    target = customers[0]
+    cohort_data = find_similar_cohort(db_session, target, k=10)
+
+    assert cohort_data["available"] is True
+    assert cohort_data["total_similar"] == 10
+    assert cohort_data["churned_count"] + cohort_data["retained_count"] == 10
+    assert 0.0 <= cohort_data["historical_churn_rate"] <= 1.0
+    assert len(cohort_data["similar_customers"]) == 10
+    # Make sure target is not comparing to itself
+    assert all(c["id"] != target.id for c in cohort_data["similar_customers"])
+
+
+def test_cohort_endpoint_without_model(client, db_session, monkeypatch, tmp_path):
+    monkeypatch.setattr(artifacts, "DEFAULT_MODELS_DIR", tmp_path)
+    customer = Customer(external_id="ZZP-TEST", churned=False)
+    db_session.add(customer)
+    db_session.flush()
+
+    response = client.get(f"/api/v1/churn/customers/{customer.id}/cohort")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["available"] is False
+    assert "No model has been trained yet" in data["message"]

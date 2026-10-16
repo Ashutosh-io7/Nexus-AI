@@ -28,6 +28,17 @@ from app.schemas.churn import (
     PredictionRunResponse,
 )
 
+from app.ml.cohort import find_similar_cohort
+from app.schemas.churn import (
+    CustomerCohortResponse,
+    CustomerExplanationResponse,
+    CustomerPredictionResponse,
+    FeatureContribution,
+    ModelMetrics,
+    ModelStatusResponse,
+    PredictionRunResponse,
+)
+
 router = APIRouter()
 
 NO_MODEL_MESSAGE = (
@@ -183,3 +194,23 @@ def get_customer_explanation(customer_id: int, db: Session = Depends(get_db)):
         other_impact=result["other_impact"],
         other_count=result["other_count"],
     )
+
+
+@router.get(
+    "/customers/{customer_id}/cohort",
+    response_model=CustomerCohortResponse,
+    summary="Top similar historical accounts with known churn outcomes",
+)
+def get_customer_cohort(
+    customer_id: int,
+    k: int = 15,
+    db: Session = Depends(get_db),
+):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found.")
+    version = current_model_version()
+    if version is None:
+        return CustomerCohortResponse(available=False, message=NO_MODEL_MESSAGE)
+    result = find_similar_cohort(db, customer, k=k)
+    return CustomerCohortResponse(**result)

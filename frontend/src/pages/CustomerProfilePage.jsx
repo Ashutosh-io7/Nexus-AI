@@ -1,25 +1,29 @@
-import { AlertCircle, ArrowDown, ArrowLeft, ArrowUp } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   getCustomer,
   getCustomerExplanation,
   getCustomerPrediction,
+  getCustomerCohort,
 } from '../lib/api'
 import { formatDate, formatMoney, formatPercent, outcomeLabel } from '../lib/format'
 
 const INTELLIGENCE = [
   {
-    kind: 'Retrieved',
-    title: 'Support history',
-    text: "Needs this customer's support tickets, which are not imported yet.",
-  },
-  {
     kind: 'Suggested',
     title: 'Next step',
-    text: 'Recommendations need risk and evidence first.',
+    text: 'Retention recommendations need risk and evidence first.',
   },
 ]
+
 
 function NotProvided() {
   return <span className="font-normal text-muted">Not provided</span>
@@ -258,6 +262,123 @@ function WhyItem({ customerId }) {
   )
 }
 
+function SimilarCohortItem({ customerId }) {
+  const [state, setState] = useState({ phase: 'loading' })
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    getCustomerCohort(customerId)
+      .then((data) => {
+        if (!cancelled) setState({ phase: 'ready', data })
+      })
+      .catch((error) => {
+        if (!cancelled) setState({ phase: 'error', message: error.message })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [customerId])
+  let body
+  if (state.phase === 'loading') {
+    body = <div className="mt-2 h-20 rounded bg-line motion-safe:animate-pulse" />
+  } else if (state.phase === 'error') {
+    body = (
+      <p className="mt-1 text-sm text-muted">
+        <span className="font-medium text-ink">Could not load cohort.</span>{' '}
+        {state.message}
+      </p>
+    )
+  } else if (!state.data.available) {
+    body = (
+      <p className="mt-1 text-sm text-muted">
+        <span className="font-medium text-ink">Not available yet.</span>{' '}
+        {state.data.message}
+      </p>
+    )
+  } else {
+    const cohort = state.data
+    const churnPct = Math.round(cohort.historical_churn_rate * 100)
+    body = (
+      <div className="mt-2 space-y-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="font-display text-2xl font-medium text-ink">
+            {churnPct}% Churned
+          </p>
+          <span className="text-xs text-muted">
+            {cohort.churned_count} of {cohort.total_similar} similar accounts
+          </span>
+        </div>
+        <p className="text-xs text-muted leading-relaxed">
+          Based on the {cohort.total_similar} past accounts with closest usage, tenure, and billing attributes.
+          {cohort.avg_tenure_months && ` Avg tenure: ${cohort.avg_tenure_months} mo.`}
+          {cohort.avg_monthly_revenue && ` Avg MRR: $${cohort.avg_monthly_revenue}.`}
+        </p>
+        {cohort.similar_customers.length > 0 && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+            >
+              {expanded ? 'Hide historical matches' : `View ${cohort.similar_customers.length} nearest accounts`}
+              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {expanded && (
+              <ul className="mt-3 space-y-2 border-t border-line pt-2 text-xs">
+                {cohort.similar_customers.slice(0, 8).map((peer) => {
+                  const didChurn = peer.churned === true
+                  const matchPct = Math.round(peer.similarity_score * 100)
+                  return (
+                    <li
+                      key={peer.id}
+                      className="flex items-center justify-between rounded-md bg-paper p-2"
+                    >
+                      <div className="truncate pr-2">
+                        <Link
+                          to={`/app/customers/${peer.id}`}
+                          className="font-medium text-ink hover:underline"
+                        >
+                          {peer.name}
+                        </Link>
+                        <p className="text-[11px] text-muted">
+                          {peer.subscription_plan || 'Plan not set'} · {peer.tenure_months ?? 0} mo
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-[11px] text-muted">{matchPct}% match</span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            didChurn
+                              ? 'bg-red-50 text-red-700'
+                              : 'bg-emerald-50 text-emerald-700'
+                          }`}
+                        >
+                          {didChurn ? 'Churned' : 'Retained'}
+                        </span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+  return (
+    <li className="py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-medium">Similar past customers</h3>
+        <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-muted">
+          Cohort
+        </span>
+      </div>
+      {body}
+    </li>
+  )
+}
+
 
 function CustomerProfilePage() {
   const { customerId } = useParams()
@@ -452,6 +573,7 @@ function CustomerProfilePage() {
           <ul className="mt-4 divide-y divide-line">
             <ChurnRiskItem customerId={customer.id} />
             <WhyItem customerId={customer.id} />
+            <SimilarCohortItem customerId={customer.id} />
             {INTELLIGENCE.map((item) => (
               <li key={item.title} className="py-3">
                 <div className="flex items-baseline justify-between gap-3">

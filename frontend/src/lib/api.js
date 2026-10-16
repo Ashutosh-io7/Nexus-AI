@@ -180,3 +180,9 @@ export async function searchPlaybook(query) {
   if (!response.ok) throw new Error(await readErrorMessage(response))
   return response.json()
 }
+
+export function getCustomerCohort(customerId, k = 15) {
+  return apiRequest(
+    `/api/v1/churn/customers/${encodeURIComponent(customerId)}/cohort?k=${k}`,
+  )
+}
