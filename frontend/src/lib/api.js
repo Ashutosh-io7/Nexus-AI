@@ -186,3 +186,21 @@ export function getCustomerCohort(customerId, k = 15) {
     `/api/v1/churn/customers/${encodeURIComponent(customerId)}/cohort?k=${k}`,
   )
 }
+
+export function generateRetentionAction(customerId) {
+  return apiRequest(`/api/v1/retention/customers/${encodeURIComponent(customerId)}/generate`, {
+    method: 'POST',
+  })
+}
+
+export function getCustomerRetentionAction(customerId) {
+  return apiRequest(`/api/v1/retention/customers/${encodeURIComponent(customerId)}`)
+}
+
+export function updateRetentionActionStatus(actionId, payload) {
+  return apiRequest(`/api/v1/retention/actions/${encodeURIComponent(actionId)}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}

@@ -3,26 +3,28 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Copy,
+  Loader2,
+  RotateCw,
+  Sparkles,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
+  generateRetentionAction,
   getCustomer,
+  getCustomerCohort,
   getCustomerExplanation,
   getCustomerPrediction,
-  getCustomerCohort,
+  getCustomerRetentionAction,
+  updateRetentionActionStatus,
 } from '../lib/api'
 import { formatDate, formatMoney, formatPercent, outcomeLabel } from '../lib/format'
 
-const INTELLIGENCE = [
-  {
-    kind: 'Suggested',
-    title: 'Next step',
-    text: 'Retention recommendations need risk and evidence first.',
-  },
-]
 
 
 function NotProvided() {
@@ -380,6 +382,252 @@ function SimilarCohortItem({ customerId }) {
 }
 
 
+function RetentionActionItem({ customerId, customerChurned }) {
+  const [state, setState] = useState({ phase: 'loading' })
+  const [actionState, setActionState] = useState({ isBusy: false, message: '' })
+  const [copied, setCopied] = useState(false)
+
+  function loadAction() {
+    if (customerChurned) {
+      setState({
+        phase: 'churned',
+        message: 'This customer has already left, so no retention action is applicable.',
+      })
+      return
+    }
+
+    getCustomerRetentionAction(customerId)
+      .then((res) => {
+        if (res.available && res.action) {
+          setState({ phase: 'ready', action: res.action })
+        } else {
+          setState({ phase: 'empty', message: res.message })
+        }
+      })
+      .catch((err) => setState({ phase: 'error', message: err.message }))
+  }
+
+  useEffect(() => {
+    loadAction()
+  }, [customerId, customerChurned])
+
+  async function handleGenerate() {
+    setActionState({ isBusy: true, message: 'Synthesizing signals & playbook rules…' })
+    try {
+      const res = await generateRetentionAction(customerId)
+      if (res.available && res.action) {
+        setState({ phase: 'ready', action: res.action })
+      } else {
+        setState({ phase: 'error', message: res.message || 'Generation failed.' })
+      }
+    } catch (err) {
+      setState({ phase: 'error', message: err.message })
+    } finally {
+      setActionState({ isBusy: false, message: '' })
+    }
+  }
+
+  async function handleStatusUpdate(newStatus) {
+    if (!state.action) return
+    setActionState({ isBusy: true, message: `Marking as ${newStatus}…` })
+    try {
+      const updated = await updateRetentionActionStatus(state.action.id, {
+        status: newStatus,
+      })
+      setState({ phase: 'ready', action: updated })
+    } catch (err) {
+      alert(`Failed to update status: ${err.message}`)
+    } finally {
+      setActionState({ isBusy: false, message: '' })
+    }
+  }
+
+  function handleCopyEmail(body) {
+    navigator.clipboard.writeText(body)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  let bodyContent
+  if (state.phase === 'loading') {
+    bodyContent = <div className="mt-2 h-24 rounded bg-line motion-safe:animate-pulse" />
+  } else if (state.phase === 'churned') {
+    bodyContent = (
+      <p className="mt-1 text-sm text-muted">
+        <span className="font-medium text-ink">Customer left.</span> {state.message}
+      </p>
+    )
+  } else if (state.phase === 'error') {
+    bodyContent = (
+      <div className="mt-2 space-y-2">
+        <p className="text-sm text-muted">
+          <span className="font-medium text-ink">Could not load plan:</span> {state.message}
+        </p>
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={actionState.isBusy}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink hover:border-accent"
+        >
+          {actionState.isBusy ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+          Retry agent generation
+        </button>
+      </div>
+    )
+  } else if (state.phase === 'empty') {
+    bodyContent = (
+      <div className="mt-2 space-y-2">
+        <p className="text-sm text-muted">
+          No retention plan generated yet. Synthesize signals and company policy into a grounded action.
+        </p>
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={actionState.isBusy}
+          className="inline-flex items-center gap-2 rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper shadow-2xs hover:bg-neutral-800 disabled:opacity-50"
+        >
+          {actionState.isBusy ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <Sparkles size={13} className="text-amber-300" />
+          )}
+          {actionState.isBusy ? 'Synthesizing retention plan…' : 'Generate retention plan'}
+        </button>
+      </div>
+    )
+  } else {
+    const action = state.action
+    const isProposed = action.status === 'proposed'
+    const isApproved = action.status === 'approved'
+    const isRejected = action.status === 'rejected'
+
+    bodyContent = (
+      <div className="mt-3 space-y-4 text-xs">
+        {/* Status Badge & Header */}
+        <div className="flex items-center justify-between gap-2 border-b border-line pb-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
+                isApproved
+                  ? 'bg-emerald-50 text-emerald-800'
+                  : isRejected
+                  ? 'bg-neutral-100 text-neutral-700'
+                  : 'bg-amber-50 text-amber-800'
+              }`}
+            >
+              {action.status}
+            </span>
+            {isApproved && action.approved_at && (
+              <span className="text-muted">Approved on {formatDate(action.approved_at)}</span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={actionState.isBusy}
+            title="Re-run LangGraph agent"
+            className="inline-flex items-center gap-1 text-[11px] text-muted hover:text-ink disabled:opacity-50"
+          >
+            <RotateCw size={12} className={actionState.isBusy ? 'animate-spin' : ''} />
+            Re-generate
+          </button>
+        </div>
+
+        {/* Diagnosis */}
+        <div>
+          <span className="font-medium text-ink">Diagnosis</span>
+          <p className="mt-1 leading-relaxed text-muted">{action.diagnosis}</p>
+        </div>
+
+        {/* Action Strategy */}
+        <div>
+          <span className="font-medium text-ink">Recommended action strategy</span>
+          <p className="mt-1 leading-relaxed text-muted">{action.action_strategy}</p>
+        </div>
+
+        {/* Playbook Citations */}
+        {action.policy_citations && action.policy_citations.length > 0 && (
+          <div>
+            <span className="font-medium text-ink">Company playbook citations</span>
+            <ul className="mt-1.5 space-y-1">
+              {action.policy_citations.map((c, i) => (
+                <li
+                  key={i}
+                  className="rounded border border-line bg-paper px-2 py-1 text-[11px] text-muted"
+                >
+                  <span className="font-medium text-ink">
+                    p. {c.page_number} · {c.section_title}:
+                  </span>{' '}
+                  {c.rule_summary}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Draft Email */}
+        <div className="rounded-lg border border-line bg-paper p-3">
+          <div className="flex items-center justify-between gap-2 border-b border-line pb-1.5">
+            <span className="font-medium text-ink">Draft email for customer</span>
+            <button
+              type="button"
+              onClick={() => handleCopyEmail(action.email_body)}
+              className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-[11px] font-medium text-ink hover:text-accent"
+            >
+              {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+              {copied ? 'Copied!' : 'Copy email'}
+            </button>
+          </div>
+          <p className="mt-2 text-muted">
+            <span className="font-medium text-ink">Subject:</span> {action.email_subject}
+          </p>
+          <p className="mt-2 whitespace-pre-wrap leading-relaxed text-muted">
+            {action.email_body}
+          </p>
+        </div>
+
+        {/* Human-in-the-Loop Action Controls */}
+        {isProposed && (
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => handleStatusUpdate('approved')}
+              disabled={actionState.isBusy}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+            >
+              <CheckCircle2 size={13} />
+              Approve strategy
+            </button>
+            <button
+              type="button"
+              onClick={() => handleStatusUpdate('rejected')}
+              disabled={actionState.isBusy}
+              className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-muted hover:border-ink hover:text-ink disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <li className="py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-medium">Retention strategy & action</h3>
+        <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-muted">
+          Agentic
+        </span>
+      </div>
+      {bodyContent}
+    </li>
+  )
+}
+
+
+
 function CustomerProfilePage() {
   const { customerId } = useParams()
   const idIsValid = /^\d+$/.test(customerId)
@@ -571,23 +819,15 @@ function CustomerProfilePage() {
             yet says so instead of guessing.
           </p>
           <ul className="mt-4 divide-y divide-line">
+
             <ChurnRiskItem customerId={customer.id} />
             <WhyItem customerId={customer.id} />
             <SimilarCohortItem customerId={customer.id} />
-            {INTELLIGENCE.map((item) => (
-              <li key={item.title} className="py-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="text-sm font-medium">{item.title}</h3>
-                  <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-muted">
-                    {item.kind}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-muted">
-                  <span className="font-medium text-ink">Not available yet.</span>{' '}
-                  {item.text}
-                </p>
-              </li>
-            ))}
+            <RetentionActionItem 
+              customerId={customer.id}
+              customerChurned={customer.churned}
+            />
+
           </ul>
         </aside>
       </div>

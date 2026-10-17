@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str | None = None
     gemini_embedding_model: str = "models/gemini-embedding-001"
-    gemini_llm_model: str = "gemini-1.5-flash"
+    gemini_llm_model: str = "gemini-2.5-flash"
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
