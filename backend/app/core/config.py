@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = "models/gemini-embedding-001"
     gemini_llm_model: str = "gemini-2.5-flash"
 
+    # JWT Authentication settings
+    jwt_secret_key: str = "nexus-insecure-secret-key-change-in-production-2026"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24  # 24 Hours
+
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
         extra="ignore",
