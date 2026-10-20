@@ -123,10 +123,19 @@ export async function getCustomer(id) {
   return response.json()
 }
 
-async function apiRequest(path, options) {
+async function apiRequest(path, options = {}) {
+  const token = localStorage.getItem('nexus_token')
+  const headers = {
+    ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+
   let response
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, options)
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    })
   } catch {
     throw new Error(
       "Can't reach the Nexus API. Make sure the backend is running.",
@@ -203,4 +212,30 @@ export function updateRetentionActionStatus(actionId, payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
+}
+
+export async function loginUser(email, password) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json()
+}
+
+export async function getCurrentUser() {
+  const token = localStorage.getItem('nexus_token')
+  if (!token) return null
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('nexus_token')
+      return null
+    }
+    throw new Error(await readErrorMessage(response))
+  }
+  return response.json()
 }
